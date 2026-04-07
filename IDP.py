@@ -215,6 +215,9 @@ def extract_jd_text_from_upload(uploaded_file):
     st.warning("Unsupported JD file type. Please upload PDF or DOCX.")
     return ""
 
+
+
+
 def reset_run_state():
     st.session_state["review_data"] = None
     st.session_state["confidence_map"] = None
@@ -232,13 +235,10 @@ def reset_run_state():
     st.session_state["agent_logs"] = []
     st.session_state["current_step"] = "Waiting"
     st.session_state["progress_value"] = 0
-    st.session_state["live_step_placeholder"] = None
-    st.session_state["live_progress_placeholder"] = None
-    st.session_state["live_event_placeholder"] = None
-    st.session_state["live_pipeline_placeholder"] = None
     st.session_state["duplicate_info"] = None
     st.session_state["agent_timings"] = {}
     st.session_state["active_agent"] = None
+
 
 def reset_single_file_state():
     st.session_state["review_data"] = None
@@ -257,10 +257,8 @@ def reset_single_file_state():
     st.session_state["agent_logs"] = []
     st.session_state["current_step"] = "Waiting"
     st.session_state["progress_value"] = 0
-    st.session_state["live_pipeline_placeholder"] = None
     st.session_state["agent_timings"] = {}
     st.session_state["active_agent"] = None
-
 
 def save_temp_file(uploaded_file):
     suffix = Path(uploaded_file.name).suffix
@@ -778,7 +776,6 @@ def normalize_graph_result(result):
         "needs_review": result.get("needs_review", False),
     }
 
-
 def process_single_file(uploaded_file):
     reset_single_file_state()
     st.session_state.current_file = uploaded_file.name
@@ -802,6 +799,8 @@ def process_single_file(uploaded_file):
     if not full_text:
         reason = extracted["exception_reason"] or "No extractable text"
         record_agent_event("Retrieval Agent", "error", "Skipped due to missing text")
+        record_agent_event("Classification Agent", "error", "Skipped due to missing text")
+        record_agent_event("Structuring Agent", "error", "Skipped due to missing text")
         record_agent_event("Validation Agent", "error", "Skipped due to missing text")
         record_agent_event("Output Agent", "error", "Skipped due to missing text")
         return {
@@ -817,7 +816,9 @@ def process_single_file(uploaded_file):
                 "match_file": None,
                 "reason": None,
                 "score": 0.0,
-            }
+            },
+            "agent_events": st.session_state.get("agent_events", []),
+            "agent_timings": st.session_state.get("agent_timings", {}),
         }
 
     st.session_state.full_text = full_text
@@ -932,6 +933,8 @@ def process_single_file(uploaded_file):
         "full_text": full_text,
         "cost": round(after_cost - before_cost, 6),
         "tokens": after_tokens - before_tokens,
+        "agent_events": deepcopy(st.session_state.get("agent_events", [])),
+        "agent_timings": deepcopy(st.session_state.get("agent_timings", {})),
     }
 
 
@@ -951,6 +954,10 @@ def load_batch_result_into_session(index):
     st.session_state.vectorstore = item.get("vectorstore")
     st.session_state.full_text = item.get("full_text")
     st.session_state.generated_resume = ((item.get("auto_result") or {}).get("result") or {}).get("file")
+    st.session_state["agent_events"] = deepcopy(item.get("agent_events", []))
+    st.session_state["agent_timings"] = deepcopy(item.get("agent_timings", {}))
+    st.session_state["active_agent"] = None
+    refresh_live_batch_activity()
 
 
 def get_batch_signature(uploaded_files):
