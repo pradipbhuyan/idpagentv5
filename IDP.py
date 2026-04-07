@@ -1512,7 +1512,6 @@ def render_result_workspace():
             render_resume_review_form()
         
     else:
-        else:
         text = st.session_state.get("full_text", "")
         if text:
             st.text_area("Preview", value=text[:2500], height=180, label_visibility="collapsed")
