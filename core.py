@@ -91,7 +91,14 @@ def invoke_llm_tracked(prompt: str):
         raise ValueError("Missing API key")
 
     model_name = st_state.get("model_choice", "gpt-4o-mini")
-    llm = ChatOpenAI(model=model_name, temperature=0, api_key=st_state["api_key"])
+    
+    llm = ChatOpenAI(
+    model=model_name,
+    temperature=0,
+    api_key=st_state["api_key"],
+    timeout=90,
+    max_retries=1,
+    )
 
     start = time.time()
     response = llm.invoke(prompt)
@@ -156,7 +163,14 @@ def ocr_image_bytes_with_vlm(image_bytes: bytes, mime_type: str = "image/png") -
         raise ValueError("Missing API key")
 
     model_name = st_state.get("model_choice", "gpt-4o-mini")
-    llm = ChatOpenAI(model=model_name, temperature=0, api_key=st_state["api_key"])
+
+    llm = ChatOpenAI(
+    model=model_name,
+    temperature=0,
+    api_key=st_state["api_key"],
+    timeout=90,
+    max_retries=1,
+    )
 
     encoded = base64.b64encode(image_bytes).decode()
     msg = HumanMessage(
