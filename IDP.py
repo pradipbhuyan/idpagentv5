@@ -148,6 +148,7 @@ DEFAULT_KEYS = {
     "batch_started_at": None,
     "batch_completed_at": None,
     "batch_elapsed_seconds": 0.0,
+    "current_file_started_at": None,
     "review_data": None,
     "confidence_map": None,
     "validation_result": None,
@@ -1996,28 +1997,58 @@ with left_col:
             refresh_live_batch_activity()
 
             for uploaded_file in uploaded_files:
-                st.session_state.batch_current_file = uploaded_file.name
-                update_batch_file_status(uploaded_file.name, "running", "Processing started")
-                refresh_live_batch_activity()
+                try:
+                    st.session_state["current_file_started_at"] = time.time()
+                    st.session_state.batch_current_file = uploaded_file.name
+                    update_batch_file_status(uploaded_file.name, "running", "Processing started")
+                    refresh_live_batch_activity()
 
-                result = process_single_file(uploaded_file)
-                st.session_state.batch_results.append(result)
+                    result = process_single_file(uploaded_file)
+                    st.session_state.batch_results.append(result)
 
-                if result.get("status") == "Exception":
-                    st.session_state.exception_queue.append(result)
-                    update_batch_file_status(
-                        uploaded_file.name,
-                        "error",
-                        result.get("exception_reason", "Exception")
-                    )
-                elif result.get("status") == "Review Needed":
-                    update_batch_file_status(uploaded_file.name, "done", "Review Needed")
-                else:
-                    update_batch_file_status(uploaded_file.name, "done", result.get("status", "Completed"))
+                    if result.get("status") == "Exception":
+                        st.session_state.exception_queue.append(result)
+                        update_batch_file_status(
+                            uploaded_file.name,
+                            "error",
+                            result.get("exception_reason", "Exception")
+                        )
+                    elif result.get("status") == "Review Needed":
+                        update_batch_file_status(uploaded_file.name, "done", "Review Needed")
+                    else:
+                        update_batch_file_status(
+                            uploaded_file.name,
+                            "done",
+                            result.get("status", "Completed")
+                        )
 
-                st.session_state.batch_processed_files += 1
-                st.session_state["progress_value"] = 0
-                refresh_live_batch_activity()
+                except Exception as e:
+                    error_result = {
+                        "file_name": uploaded_file.name,
+                        "status": "Exception",
+                        "doc_type": "unknown",
+                        "ocr_used": False,
+                        "exception_reason": f"Unhandled error: {str(e)}",
+                        "cost": 0.0,
+                        "tokens": 0,
+                        "duplicate_info": {
+                            "is_duplicate": False,
+                            "match_file": None,
+                            "reason": None,
+                            "score": 0.0,
+                        },
+                        "agent_events": deepcopy(st.session_state.get("agent_events", [])),
+                        "agent_timings": deepcopy(st.session_state.get("agent_timings", {})),
+                    }
+                    st.session_state.batch_results.append(error_result)
+                    st.session_state.exception_queue.append(error_result)
+                    update_batch_file_status(uploaded_file.name, "error", f"Unhandled error: {str(e)}")
+
+                finally:
+                    st.session_state.batch_processed_files += 1
+                    st.session_state["progress_value"] = 0
+                    st.session_state["current_file_started_at"] = None
+                    refresh_live_batch_activity()
 
             if st.session_state.batch_results:
                 load_batch_result_into_session(0)
@@ -2052,29 +2083,59 @@ with left_col:
                 ]
                 refresh_live_batch_activity()
 
-                for uploaded_file in uploaded_files or []:
-                    st.session_state.batch_current_file = uploaded_file.name
-                    update_batch_file_status(uploaded_file.name, "running", "Re-processing started")
-                    refresh_live_batch_activity()
+                for uploaded_file in (uploaded_files or []):
+                    try:
+                        st.session_state["current_file_started_at"] = time.time()
+                        st.session_state.batch_current_file = uploaded_file.name
+                        update_batch_file_status(uploaded_file.name, "running", "Re-processing started")
+                        refresh_live_batch_activity()
 
-                    result = process_single_file(uploaded_file)
-                    st.session_state.batch_results.append(result)
+                        result = process_single_file(uploaded_file)
+                        st.session_state.batch_results.append(result)
 
-                    if result.get("status") == "Exception":
-                        st.session_state.exception_queue.append(result)
-                        update_batch_file_status(
-                            uploaded_file.name,
-                            "error",
-                            result.get("exception_reason", "Exception")
-                        )
-                    elif result.get("status") == "Review Needed":
-                        update_batch_file_status(uploaded_file.name, "done", "Review Needed")
-                    else:
-                        update_batch_file_status(uploaded_file.name, "done", result.get("status", "Completed"))
+                        if result.get("status") == "Exception":
+                            st.session_state.exception_queue.append(result)
+                            update_batch_file_status(
+                                uploaded_file.name,
+                                "error",
+                                result.get("exception_reason", "Exception")
+                            )
+                        elif result.get("status") == "Review Needed":
+                            update_batch_file_status(uploaded_file.name, "done", "Review Needed")
+                        else:
+                            update_batch_file_status(
+                                uploaded_file.name,
+                                "done",
+                                result.get("status", "Completed")
+                            )
 
-                    st.session_state.batch_processed_files += 1
-                    st.session_state["progress_value"] = 0
-                    refresh_live_batch_activity()
+                    except Exception as e:
+                        error_result = {
+                            "file_name": uploaded_file.name,
+                            "status": "Exception",
+                            "doc_type": "unknown",
+                            "ocr_used": False,
+                            "exception_reason": f"Unhandled error: {str(e)}",
+                            "cost": 0.0,
+                            "tokens": 0,
+                            "duplicate_info": {
+                                "is_duplicate": False,
+                                "match_file": None,
+                                "reason": None,
+                                "score": 0.0,
+                            },
+                            "agent_events": deepcopy(st.session_state.get("agent_events", [])),
+                            "agent_timings": deepcopy(st.session_state.get("agent_timings", {})),
+                        }
+                        st.session_state.batch_results.append(error_result)
+                        st.session_state.exception_queue.append(error_result)
+                        update_batch_file_status(uploaded_file.name, "error", f"Unhandled error: {str(e)}")
+
+                    finally:
+                        st.session_state.batch_processed_files += 1
+                        st.session_state["progress_value"] = 0
+                        st.session_state["current_file_started_at"] = None
+                        refresh_live_batch_activity()
 
                 if st.session_state.batch_results:
                     load_batch_result_into_session(0)
@@ -2085,7 +2146,7 @@ with left_col:
                         st.session_state.batch_completed_at - st.session_state.batch_started_at
                     )
                     st.success("Batch re-processing completed")
-
+                    
                 st.session_state.show_reprocess_confirm = False
                 st.session_state.pending_batch_signature = None
                 st.rerun()
