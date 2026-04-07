@@ -1512,14 +1512,57 @@ def render_result_workspace():
             render_resume_review_form()
         
     else:
+        else:
         text = st.session_state.get("full_text", "")
         if text:
             st.text_area("Preview", value=text[:2500], height=180, label_visibility="collapsed")
 
-        if st.button("Next Document", use_container_width=True, disabled=not has_next, key="generic_next"):
-            go_to_next_batch_result()
-            st.rerun()
+        g1, g2 = st.columns(2)
 
+        with g1:
+            if st.button("Chat with Document", use_container_width=True, key="generic_chat"):
+                st.session_state["open_doc_chat"] = True
+
+        with g2:
+            if st.button("Next Document", use_container_width=True, disabled=not has_next, key="generic_next"):
+                go_to_next_batch_result()
+                st.rerun()
+
+        if st.session_state.get("open_doc_chat"):
+            st.markdown("#### Document Chat")
+
+            user_q = st.text_input("Ask a question about this document", key="generic_doc_chat_q")
+
+            if st.button("Ask", use_container_width=True, key="generic_doc_chat_ask"):
+                full_text = st.session_state.get("full_text", "")
+                if not full_text.strip():
+                    st.warning("No document text available for chat.")
+                else:
+                    try:
+                        llm = get_llm(st.session_state["api_key"], st.session_state.get("model_choice", "gpt-4o-mini"))
+                        prompt = f"""
+Answer the user's question using only the document text below.
+If the answer is not in the document, say so clearly.
+
+DOCUMENT TEXT:
+{full_text[:12000]}
+
+QUESTION:
+{user_q}
+"""
+                        answer = llm.invoke(prompt).content
+                        st.session_state.setdefault("generic_doc_chat_history", []).append({
+                            "question": user_q,
+                            "answer": answer,
+                        })
+                    except Exception as e:
+                        st.error(f"Chat failed: {str(e)}")
+
+            history = st.session_state.get("generic_doc_chat_history", [])
+            if history:
+                for item in reversed(history[-5:]):
+                    st.markdown(f"**Q:** {item['question']}")
+                    st.markdown(f"**A:** {item['answer']}")
 
 def render_batch_table():
     st.markdown("### Batch Results")
