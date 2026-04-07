@@ -1482,10 +1482,14 @@ def render_result_workspace():
                 st.rerun()
                 
     elif doc_type == "resume":
-        top1, top2, top3 = st.columns([2, 1, 1])
-        with top1:
-            st.caption(f"Output File: {result.get('file_name', 'generated_resume.docx')}")
-        with top2:
+        st.caption(f"Output File: {result.get('file_name', 'generated_resume.docx')}")
+
+        r1, r2, r3 = st.columns(3)
+        with r1:
+            if st.button("Regenerate Resume", use_container_width=True, key="resume_regen"):
+                regenerate_resume_from_review()
+
+        with r2:
             if result.get("file"):
                 st.download_button(
                     "Download Resume",
@@ -1494,21 +1498,19 @@ def render_result_workspace():
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True
                 )
-        with top3:
+
+        with r3:
             if st.button("Next Document", use_container_width=True, disabled=not has_next, key="resume_next"):
                 go_to_next_batch_result()
                 st.rerun()
-
+                
         render_validation_summary()
         render_duplicate_warning()
         render_confidence_table()
 
         with st.expander("Review & Edit", expanded=True):
             render_resume_review_form()
-
-        if st.button("Regenerate Resume", use_container_width=True, key="resume_regen"):
-            regenerate_resume_from_review()
-
+        
     else:
         text = st.session_state.get("full_text", "")
         if text:
