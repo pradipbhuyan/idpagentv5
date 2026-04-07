@@ -492,13 +492,13 @@ def refresh_live_batch_activity():
         overall_progress = per_file_progress
 
     if step_placeholder is not None:
-    elapsed = st.session_state.get("batch_elapsed_seconds", 0.0)
+        elapsed = st.session_state.get("batch_elapsed_seconds", 0.0)
 
-    if total_files > 0:
-        elapsed_line = f"**Elapsed:** {elapsed:.2f} sec  " if elapsed > 0 else ""
+        if total_files > 0:
+            elapsed_line = f"**Elapsed:** {elapsed:.2f} sec  " if elapsed > 0 else ""
 
-        step_placeholder.markdown(
-            f"""
+            step_placeholder.markdown(
+                f"""
 #### Batch Progress
 
 **Current File:** {current_file or "-"}  
@@ -507,8 +507,7 @@ def refresh_live_batch_activity():
 **Exceptions:** {exception_count}  
 {elapsed_line}
 """
-        )
- 
+            )
         else:
             if current_step != "Waiting":
                 step_placeholder.markdown(f"#### Progress\n\n**Current Step:** {current_step}")
@@ -568,7 +567,7 @@ def refresh_live_batch_activity():
                     content.append(line)
 
         event_placeholder.markdown("\n\n".join(content) if content else "")
-
+        
 def render_agent_pipeline():
     st.markdown("#### Agentic Pipeline")
 
