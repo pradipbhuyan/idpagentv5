@@ -11,6 +11,7 @@ import hashlib
 from io import BytesIO
 from pathlib import Path
 from copy import deepcopy
+import textwrap
 
 import pandas as pd
 import streamlit as st
@@ -600,6 +601,7 @@ def refresh_live_batch_activity():
     render_agent_pipeline()
 
 
+
 def render_agent_pipeline():
     pipeline_placeholder = st.session_state.get("live_pipeline_placeholder")
     if pipeline_placeholder is None:
@@ -634,13 +636,13 @@ def render_agent_pipeline():
             }
 
     html_parts = [
-        """
+        textwrap.dedent("""
         <div style="margin-top:10px;">
             <div style="font-weight:700;font-size:16px;margin-bottom:10px;">
                 Agentic Pipeline
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:10px;">
-        """
+        """).strip()
     ]
 
     for step in pipeline:
@@ -672,39 +674,39 @@ def render_agent_pipeline():
             icon = "⏳"
             text = "#6b7280"
 
-        timing_text = ""
         if elapsed is not None:
-            timing_text = f"{elapsed:.2f}s"
+            subtitle = f"{elapsed:.2f}s"
         elif (status == "running" or step == active_agent) and running_since:
-            timing_text = f"{round(time.time() - running_since, 2)}s"
+            subtitle = f"{round(time.time() - running_since, 2)}s"
+        else:
+            subtitle = item.get("message") or "Pending"
 
-        subtitle = timing_text or ("Pending" if status == "pending" else item.get("message", ""))
-
-        html_parts.append(
-            f"""
-            <div style="
-                min-width:120px;
-                flex:1 1 120px;
-                padding:12px 10px;
-                border-radius:14px;
-                border:1px solid {border};
-                background:{bg};
-                text-align:center;
-            ">
-                <div style="font-size:18px;line-height:1;">{icon}</div>
-                <div style="font-weight:700;color:{text};font-size:12px;margin-top:6px;">
-                    {short_name}
-                </div>
-                <div style="font-size:11px;color:#4b5563;margin-top:4px;">
-                    {subtitle}
-                </div>
+        card_html = textwrap.dedent(f"""
+        <div style="
+            min-width:120px;
+            flex:1 1 120px;
+            padding:12px 10px;
+            border-radius:14px;
+            border:1px solid {border};
+            background:{bg};
+            text-align:center;
+        ">
+            <div style="font-size:18px;line-height:1;">{icon}</div>
+            <div style="font-weight:700;color:{text};font-size:12px;margin-top:6px;">
+                {short_name}
             </div>
-            """
-        )
+            <div style="font-size:11px;color:#4b5563;margin-top:4px;">
+                {subtitle}
+            </div>
+        </div>
+        """).strip()
+
+        html_parts.append(card_html)
 
     html_parts.append("</div></div>")
 
     pipeline_placeholder.markdown("".join(html_parts), unsafe_allow_html=True)
+
 
 def update_batch_file_status(file_name, status, message=""):
     statuses = st.session_state.get("batch_file_statuses", [])
