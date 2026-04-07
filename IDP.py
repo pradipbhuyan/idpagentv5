@@ -1525,12 +1525,13 @@ def render_batch_table():
     if elapsed:
         st.caption(f"Batch processed in {elapsed:.2f} sec")
 
-    if not st.session_state.batch_results:
+    batch_results = st.session_state.get("batch_results", [])
+    if not batch_results:
         st.caption("No batch results yet")
         return
 
     rows = []
-    for item in st.session_state.batch_results:
+    for item in batch_results:
         dup = item.get("duplicate_info") or {}
         rows.append({
             "File": item.get("file_name"),
@@ -1545,15 +1546,21 @@ def render_batch_table():
     df = pd.DataFrame(rows)
     st.dataframe(df, use_container_width=True, hide_index=True, height=220)
 
+    current_index = st.session_state.get("active_batch_index", 0)
+    if current_index < 0 or current_index >= len(batch_results):
+        current_index = 0
+        st.session_state["active_batch_index"] = 0
+
     selected = st.selectbox(
         "Open processed document",
-        options=list(range(len(st.session_state.batch_results))),
-        format_func=lambda i: f"{st.session_state.batch_results[i]['file_name']} ({st.session_state.batch_results[i]['status']})",
-        index=st.session_state.get("active_batch_index", 0) if st.session_state.batch_results else 0,
+        options=list(range(len(batch_results))),
+        format_func=lambda i: f"{batch_results[i]['file_name']} ({batch_results[i]['status']})",
+        index=current_index,
+        key="batch_result_selector",
     )
-    if selected is not None:
-        load_batch_result_into_session(selected)
 
+    if selected is not None and 0 <= selected < len(batch_results):
+        load_batch_result_into_session(selected)
 
 def render_exception_queue():
     st.markdown("### Exception Queue")
