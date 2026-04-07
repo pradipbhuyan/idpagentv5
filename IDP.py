@@ -12,6 +12,7 @@ from io import BytesIO
 from pathlib import Path
 from copy import deepcopy
 import textwrap
+import json
 
 import pandas as pd
 import streamlit as st
@@ -1404,7 +1405,7 @@ def render_result_workspace():
         with st.expander("Review & Edit", expanded=True):
             render_invoice_review_form()
 
-        b1, b2, b3 = st.columns(3)
+        b1, b2, b3, b4 = st.columns(4)
         with b1:
             if st.button("Approve & Send to Concur", use_container_width=True, key="invoice_send"):
                 handle_invoice_or_ticket_submission("invoice")
@@ -1416,14 +1417,27 @@ def render_result_workspace():
                     "Download Excel",
                     excel,
                     f"{(data.get('invoice_number') or data.get('vendor') or 'invoice_data')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
 
         with b3:
+            json_bytes = json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
+            json_name = f"{(data.get('invoice_number') or data.get('vendor') or 'invoice_data')}.json"
+            st.download_button(
+                "Download JSON",
+                json_bytes,
+                json_name,
+                mime="application/json",
+                use_container_width=True,
+                key="invoice_json_download"
+            )
+
+        with b4:
             if st.button("Next Document", use_container_width=True, disabled=not has_next, key="invoice_next"):
                 go_to_next_batch_result()
                 st.rerun()
-
+                
     elif doc_type == "ticket":
         c1, c2, c3, c4 = st.columns(4)
         with c1:
@@ -1445,16 +1459,28 @@ def render_result_workspace():
         with st.expander("Review & Edit", expanded=True):
             render_ticket_review_form()
 
-        a1, a2 = st.columns(2)
+        a1, a2, a3 = st.columns(3)
         with a1:
             if st.button("Approve & Send to Concur", use_container_width=True, key="ticket_send"):
                 handle_invoice_or_ticket_submission("ticket")
 
         with a2:
+            json_bytes = json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
+            json_name = f"{(data.get('ticket_number') or data.get('traveler_name') or 'ticket_data')}.json"
+            st.download_button(
+                "Download JSON",
+                json_bytes,
+                json_name,
+                mime="application/json",
+                use_container_width=True,
+                key="ticket_json_download"
+            )
+
+        with a3:
             if st.button("Next Document", use_container_width=True, disabled=not has_next, key="ticket_next"):
                 go_to_next_batch_result()
                 st.rerun()
-
+                
     elif doc_type == "resume":
         top1, top2, top3 = st.columns([2, 1, 1])
         with top1:
