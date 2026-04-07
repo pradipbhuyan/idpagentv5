@@ -143,6 +143,9 @@ DEFAULT_KEYS = {
     "batch_processed_files": 0,
     "batch_current_file": None,
     "batch_file_statuses": [],
+    "batch_started_at": None,
+    "batch_completed_at": None,
+    "batch_elapsed_seconds": 0.0,
     "review_data": None,
     "confidence_map": None,
     "validation_result": None,
@@ -489,17 +492,23 @@ def refresh_live_batch_activity():
         overall_progress = per_file_progress
 
     if step_placeholder is not None:
-        if total_files > 0:
-            step_placeholder.markdown(
-                f"""
+    elapsed = st.session_state.get("batch_elapsed_seconds", 0.0)
+
+    if total_files > 0:
+        elapsed_line = f"**Elapsed:** {elapsed:.2f} sec  " if elapsed > 0 else ""
+
+        step_placeholder.markdown(
+            f"""
 #### Batch Progress
 
 **Current File:** {current_file or "-"}  
 **Current Step:** {current_step}  
 **Processed:** {processed_files} / {total_files}  
-**Exceptions:** {exception_count}
+**Exceptions:** {exception_count}  
+{elapsed_line}
 """
-            )
+        )
+ 
         else:
             if current_step != "Waiting":
                 step_placeholder.markdown(f"#### Progress\n\n**Current Step:** {current_step}")
@@ -559,6 +568,56 @@ def refresh_live_batch_activity():
                     content.append(line)
 
         event_placeholder.markdown("\n\n".join(content) if content else "")
+
+def render_agent_pipeline():
+    st.markdown("#### Agentic Pipeline")
+
+    doc_type = st.session_state.get("doc_type")
+    events = st.session_state.get("agent_events", [])
+
+    pipeline = [
+        "Ingestion Agent",
+        "Extraction Agent",
+        "Retrieval Agent",
+        "Classification Agent",
+        "Structuring Agent",
+        "Validation Agent",
+        "Output Agent",
+    ]
+
+    if doc_type in ["invoice", "ticket"]:
+        pipeline.append("Concur Agent")
+
+    status_map = {name: {"status": "pending", "message": ""} for name in pipeline}
+
+    for event in events:
+        step = event.get("step")
+        if step in status_map:
+            status_map[step] = {
+                "status": event.get("status", "pending"),
+                "message": event.get("message", ""),
+            }
+
+    lines = []
+    for step in pipeline:
+        item = status_map[step]
+        status = item["status"]
+
+        if status == "done":
+            icon = "✅"
+        elif status == "running":
+            icon = "🔄"
+        elif status == "error":
+            icon = "❌"
+        else:
+            icon = "⏳"
+
+        line = f"{icon} **{step}**"
+        if item.get("message"):
+            line += f"  \n{item['message']}"
+        lines.append(line)
+
+    st.markdown("\n\n".join(lines))
 
 
 def update_batch_file_status(file_name, status, message=""):
@@ -1335,6 +1394,10 @@ def render_result_workspace():
 
 def render_batch_table():
     st.markdown("### Batch Results")
+    elapsed = st.session_state.get("batch_elapsed_seconds", 0.0)
+    if elapsed:
+        st.caption(f"Batch processed in {elapsed:.2f} sec")
+
     if not st.session_state.batch_results:
         st.caption("No batch results yet")
         return
@@ -1798,6 +1861,9 @@ with left_col:
     st.session_state["live_progress_placeholder"] = st.empty()
     st.session_state["live_event_placeholder"] = st.empty()
     refresh_live_batch_activity()
+    
+    st.markdown("---")
+    render_agent_pipeline()
 
     current_batch_signature = get_batch_signature(uploaded_files)
     last_batch_signature = st.session_state.get("last_batch_signature")
@@ -1815,6 +1881,10 @@ with left_col:
             st.session_state.show_reprocess_confirm = False
             st.session_state.pending_batch_signature = None
 
+            st.session_state.batch_started_at = time.time()
+            st.session_state.batch_completed_at = None
+            st.session_state.batch_elapsed_seconds = 0.0
+            
             st.session_state.batch_total_files = len(uploaded_files)
             st.session_state.batch_processed_files = 0
             st.session_state.batch_current_file = None
@@ -1852,6 +1922,10 @@ with left_col:
                 load_batch_result_into_session(0)
                 st.session_state.batch_processed = True
                 st.session_state.last_batch_signature = current_batch_signature
+                st.session_state.batch_completed_at = time.time()
+                st.session_state.batch_elapsed_seconds = (
+                    st.session_state.batch_completed_at - st.session_state.batch_started_at
+                )
                 st.success("Batch processing completed")
 
     if st.session_state.get("show_reprocess_confirm"):
@@ -1864,6 +1938,9 @@ with left_col:
                 st.session_state.batch_results = []
                 st.session_state.exception_queue = []
                 st.session_state.jd_rankings = []
+                st.session_state.batch_started_at = time.time()
+                st.session_state.batch_completed_at = None
+                st.session_state.batch_elapsed_seconds = 0.0
 
                 st.session_state.batch_total_files = len(uploaded_files or [])
                 st.session_state.batch_processed_files = 0
@@ -1902,6 +1979,10 @@ with left_col:
                     load_batch_result_into_session(0)
                     st.session_state.batch_processed = True
                     st.session_state.last_batch_signature = st.session_state.get("pending_batch_signature")
+                    st.session_state.batch_completed_at = time.time()
+                    st.session_state.batch_elapsed_seconds = (
+                        st.session_state.batch_completed_at - st.session_state.batch_started_at
+                    )
                     st.success("Batch re-processing completed")
 
                 st.session_state.show_reprocess_confirm = False
