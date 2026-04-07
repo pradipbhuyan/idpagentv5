@@ -174,6 +174,8 @@ DEFAULT_KEYS = {
     "jd_rankings": [],
     "detailed_assessment_data": None,
     "detailed_assessment_pdf": None,
+    "agent_timings": {},
+    "active_agent": None,
 }
 
 for key, value in DEFAULT_KEYS.items():
@@ -233,6 +235,8 @@ def reset_run_state():
     st.session_state["live_progress_placeholder"] = None
     st.session_state["live_event_placeholder"] = None
     st.session_state["duplicate_info"] = None
+    st.session_state["agent_timings"] = {}
+    st.session_state["active_agent"] = None
 
 
 def reset_single_file_state():
@@ -252,6 +256,8 @@ def reset_single_file_state():
     st.session_state["agent_logs"] = []
     st.session_state["current_step"] = "Waiting"
     st.session_state["progress_value"] = 0
+    st.session_state["agent_timings"] = {}
+    st.session_state["active_agent"] = None
 
 
 def save_temp_file(uploaded_file):
@@ -465,13 +471,33 @@ def push_agent_log(message):
 
 
 def record_agent_event(step, status, message=""):
+    now = time.time()
+
+    if "agent_timings" not in st.session_state:
+        st.session_state["agent_timings"] = {}
+
+    if status == "running":
+        if step not in st.session_state["agent_timings"]:
+            st.session_state["agent_timings"][step] = {}
+        st.session_state["agent_timings"][step]["started_at"] = now
+        st.session_state["active_agent"] = step
+
+    elif status in ["done", "error"]:
+        if step not in st.session_state["agent_timings"]:
+            st.session_state["agent_timings"][step] = {}
+        started_at = st.session_state["agent_timings"][step].get("started_at")
+        st.session_state["agent_timings"][step]["ended_at"] = now
+        if started_at:
+            st.session_state["agent_timings"][step]["elapsed"] = round(now - started_at, 2)
+        if st.session_state.get("active_agent") == step:
+            st.session_state["active_agent"] = None
+
     st.session_state.agent_events.append({
         "step": step,
         "status": status,
         "message": message,
     })
     refresh_live_batch_activity()
-
 
 def refresh_live_batch_activity():
     step_placeholder = st.session_state.get("live_step_placeholder")
@@ -574,6 +600,8 @@ def render_agent_pipeline():
 
     doc_type = st.session_state.get("doc_type")
     events = st.session_state.get("agent_events", [])
+    timings = st.session_state.get("agent_timings", {})
+    active_agent = st.session_state.get("active_agent")
 
     pipeline = [
         "Ingestion Agent",
@@ -598,26 +626,62 @@ def render_agent_pipeline():
                 "message": event.get("message", ""),
             }
 
-    lines = []
     for step in pipeline:
         item = status_map[step]
         status = item["status"]
+        elapsed = timings.get(step, {}).get("elapsed")
+        running_since = timings.get(step, {}).get("started_at")
 
         if status == "done":
+            bg = "#e8f7ee"
+            border = "#8fd19e"
             icon = "✅"
-        elif status == "running":
+            text = "#166534"
+        elif status == "running" or step == active_agent:
+            bg = "#eef4ff"
+            border = "#7aa2ff"
             icon = "🔄"
+            text = "#1d4ed8"
         elif status == "error":
+            bg = "#fdecec"
+            border = "#f5a3a3"
             icon = "❌"
+            text = "#b42318"
         else:
+            bg = "#f5f5f5"
+            border = "#dddddd"
             icon = "⏳"
+            text = "#6b7280"
 
-        line = f"{icon} **{step}**"
-        if item.get("message"):
-            line += f"  \n{item['message']}"
-        lines.append(line)
+        timing_text = ""
+        if elapsed is not None:
+            timing_text = f"{elapsed:.2f}s"
+        elif status == "running" and running_since:
+            timing_text = f"{round(time.time() - running_since, 2)}s"
 
-    st.markdown("\n\n".join(lines))
+        subtitle = item.get("message", "")
+        if timing_text:
+            subtitle = f"{subtitle} • {timing_text}" if subtitle else timing_text
+
+        st.markdown(
+            f"""
+            <div style="
+                margin-bottom:10px;
+                padding:12px 14px;
+                border-radius:14px;
+                border:1px solid {border};
+                background:{bg};
+            ">
+                <div style="font-weight:700;color:{text};font-size:14px;">
+                    {icon} {step}
+                </div>
+                <div style="font-size:12px;color:#4b5563;margin-top:4px;">
+                    {subtitle or "Pending"}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
 
 def update_batch_file_status(file_name, status, message=""):
