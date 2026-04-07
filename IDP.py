@@ -633,10 +633,15 @@ def render_agent_pipeline():
                 "message": event.get("message", ""),
             }
 
-    blocks = ["""
-#### Agentic Pipeline
-<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;">
-"""]
+    html_parts = [
+        """
+        <div style="margin-top:10px;">
+            <div style="font-weight:700;font-size:16px;margin-bottom:10px;">
+                Agentic Pipeline
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;">
+        """
+    ]
 
     for step in pipeline:
         item = status_map[step]
@@ -675,7 +680,7 @@ def render_agent_pipeline():
 
         subtitle = timing_text or ("Pending" if status == "pending" else item.get("message", ""))
 
-        blocks.append(
+        html_parts.append(
             f"""
             <div style="
                 min-width:120px;
@@ -697,9 +702,9 @@ def render_agent_pipeline():
             """
         )
 
-    blocks.append("</div>")
-    pipeline_placeholder.markdown("".join(blocks), unsafe_allow_html=True)
+    html_parts.append("</div></div>")
 
+    pipeline_placeholder.markdown("".join(html_parts), unsafe_allow_html=True)
 
 def update_batch_file_status(file_name, status, message=""):
     statuses = st.session_state.get("batch_file_statuses", [])
