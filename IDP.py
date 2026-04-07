@@ -161,11 +161,14 @@ DEFAULT_KEYS = {
     "generated_resume": None,
     "agent_events": [],
     "agent_logs": [],
+    "agent_timings": {},
+    "active_agent": None,
     "current_step": "Waiting",
     "progress_value": 0,
     "live_step_placeholder": None,
     "live_progress_placeholder": None,
     "live_event_placeholder": None,
+    "live_pipeline_placeholder": None,
     "uploader_key": 0,
     "template_library": [],
     "active_template_index": None,
@@ -174,10 +177,7 @@ DEFAULT_KEYS = {
     "jd_rankings": [],
     "detailed_assessment_data": None,
     "detailed_assessment_pdf": None,
-    "agent_timings": {},
-    "active_agent": None,
 }
-
 for key, value in DEFAULT_KEYS.items():
     if key not in st.session_state:
         st.session_state[key] = value
@@ -234,10 +234,10 @@ def reset_run_state():
     st.session_state["live_step_placeholder"] = None
     st.session_state["live_progress_placeholder"] = None
     st.session_state["live_event_placeholder"] = None
+    st.session_state["live_pipeline_placeholder"] = None
     st.session_state["duplicate_info"] = None
     st.session_state["agent_timings"] = {}
     st.session_state["active_agent"] = None
-
 
 def reset_single_file_state():
     st.session_state["review_data"] = None
@@ -256,6 +256,7 @@ def reset_single_file_state():
     st.session_state["agent_logs"] = []
     st.session_state["current_step"] = "Waiting"
     st.session_state["progress_value"] = 0
+    st.session_state["live_pipeline_placeholder"] = None
     st.session_state["agent_timings"] = {}
     st.session_state["active_agent"] = None
 
@@ -479,7 +480,8 @@ def record_agent_event(step, status, message=""):
     if status == "running":
         if step not in st.session_state["agent_timings"]:
             st.session_state["agent_timings"][step] = {}
-        st.session_state["agent_timings"][step]["started_at"] = now
+        if not st.session_state["agent_timings"][step].get("started_at"):
+            st.session_state["agent_timings"][step]["started_at"] = now
         st.session_state["active_agent"] = step
 
     elif status in ["done", "error"]:
@@ -498,7 +500,7 @@ def record_agent_event(step, status, message=""):
         "message": message,
     })
     refresh_live_batch_activity()
-
+    
 def refresh_live_batch_activity():
     step_placeholder = st.session_state.get("live_step_placeholder")
     progress_placeholder = st.session_state.get("live_progress_placeholder")
@@ -594,9 +596,14 @@ def refresh_live_batch_activity():
                     content.append(line)
 
         event_placeholder.markdown("\n\n".join(content) if content else "")
-        
+
+    render_agent_pipeline()
+
+
 def render_agent_pipeline():
-    st.markdown("#### Agentic Pipeline")
+    pipeline_placeholder = st.session_state.get("live_pipeline_placeholder")
+    if pipeline_placeholder is None:
+        return
 
     doc_type = st.session_state.get("doc_type")
     events = st.session_state.get("agent_events", [])
@@ -626,11 +633,18 @@ def render_agent_pipeline():
                 "message": event.get("message", ""),
             }
 
+    blocks = ["""
+#### Agentic Pipeline
+<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;">
+"""]
+
     for step in pipeline:
         item = status_map[step]
         status = item["status"]
         elapsed = timings.get(step, {}).get("elapsed")
         running_since = timings.get(step, {}).get("started_at")
+
+        short_name = step.replace(" Agent", "")
 
         if status == "done":
             bg = "#e8f7ee"
@@ -656,32 +670,35 @@ def render_agent_pipeline():
         timing_text = ""
         if elapsed is not None:
             timing_text = f"{elapsed:.2f}s"
-        elif status == "running" and running_since:
+        elif (status == "running" or step == active_agent) and running_since:
             timing_text = f"{round(time.time() - running_since, 2)}s"
 
-        subtitle = item.get("message", "")
-        if timing_text:
-            subtitle = f"{subtitle} • {timing_text}" if subtitle else timing_text
+        subtitle = timing_text or ("Pending" if status == "pending" else item.get("message", ""))
 
-        st.markdown(
+        blocks.append(
             f"""
             <div style="
-                margin-bottom:10px;
-                padding:12px 14px;
+                min-width:120px;
+                flex:1 1 120px;
+                padding:12px 10px;
                 border-radius:14px;
                 border:1px solid {border};
                 background:{bg};
+                text-align:center;
             ">
-                <div style="font-weight:700;color:{text};font-size:14px;">
-                    {icon} {step}
+                <div style="font-size:18px;line-height:1;">{icon}</div>
+                <div style="font-weight:700;color:{text};font-size:12px;margin-top:6px;">
+                    {short_name}
                 </div>
-                <div style="font-size:12px;color:#4b5563;margin-top:4px;">
-                    {subtitle or "Pending"}
+                <div style="font-size:11px;color:#4b5563;margin-top:4px;">
+                    {subtitle}
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True
+            """
         )
+
+    blocks.append("</div>")
+    pipeline_placeholder.markdown("".join(blocks), unsafe_allow_html=True)
 
 
 def update_batch_file_status(file_name, status, message=""):
@@ -759,9 +776,11 @@ def process_single_file(uploaded_file):
     reset_single_file_state()
     st.session_state.current_file = uploaded_file.name
 
-    record_agent_event("Ingestion Agent", "done", "File received")
+    record_agent_event("Ingestion Agent", "running", "Receiving file")
     update_progress(5, "Ingestion Agent — file received")
+    record_agent_event("Ingestion Agent", "done", "File received")
 
+    record_agent_event("Extraction Agent", "running", "Extracting text")
     extracted = process_file_with_fallback(uploaded_file)
     docs = extracted["documents"]
     full_text = extracted["text"]
@@ -793,6 +812,7 @@ def process_single_file(uploaded_file):
 
     st.session_state.full_text = full_text
 
+    record_agent_event("Retrieval Agent", "running", "Creating vector index")
     vectorstore = create_vectorstore(docs)
     st.session_state.vectorstore = vectorstore
     record_agent_event("Retrieval Agent", "done", "Vector index created")
@@ -1924,10 +1944,11 @@ with left_col:
     st.session_state["live_step_placeholder"] = st.empty()
     st.session_state["live_progress_placeholder"] = st.empty()
     st.session_state["live_event_placeholder"] = st.empty()
-    refresh_live_batch_activity()
-    
+
     st.markdown("---")
-    render_agent_pipeline()
+    st.session_state["live_pipeline_placeholder"] = st.empty()
+
+    refresh_live_batch_activity()
 
     current_batch_signature = get_batch_signature(uploaded_files)
     last_batch_signature = st.session_state.get("last_batch_signature")
@@ -1948,7 +1969,7 @@ with left_col:
             st.session_state.batch_started_at = time.time()
             st.session_state.batch_completed_at = None
             st.session_state.batch_elapsed_seconds = 0.0
-            
+
             st.session_state.batch_total_files = len(uploaded_files)
             st.session_state.batch_processed_files = 0
             st.session_state.batch_current_file = None
