@@ -799,6 +799,9 @@ def process_single_file(uploaded_file):
 
     if not full_text:
         reason = extracted["exception_reason"] or "No extractable text"
+        record_agent_event("Retrieval Agent", "error", "Skipped due to missing text")
+        record_agent_event("Validation Agent", "error", "Skipped due to missing text")
+        record_agent_event("Output Agent", "error", "Skipped due to missing text")
         return {
             "file_name": uploaded_file.name,
             "status": "Exception",
@@ -901,7 +904,6 @@ def process_single_file(uploaded_file):
     elif not validation.get("passed", True):
         status = "Review Needed"
 
-    record_agent_event("Workflow Agent", "done", f"Processing completed for {doc_type}")
     update_progress(100, "Workflow Agent — completed")
 
     save_version_snapshot(
