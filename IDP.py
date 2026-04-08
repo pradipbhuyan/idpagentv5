@@ -54,7 +54,7 @@ from core import (
 # ------------------------------
 st.set_page_config("IDP - Professional", layout="wide")
 USERS = st.secrets.get("users", {})
-MAX_BATCH_FILES = 10
+MAX_BATCH_FILES = 15
 
 # ------------------------------
 # CACHED MODELS
