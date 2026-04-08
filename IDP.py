@@ -2035,12 +2035,12 @@ left_col, right_col = st.columns([1, 1.6], gap="large")
 
 with left_col:
     st.markdown("### Activity")
-    st.session_state["live_step_placeholder"] = st.empty()
-    st.session_state["live_progress_placeholder"] = st.empty()
-    st.session_state["live_event_placeholder"] = st.empty()
+    st.session_state["live_pipeline_placeholder"] = st.empty()
 
     st.markdown("---")
-    st.session_state["live_pipeline_placeholder"] = st.empty()
+    st.session_state["live_step_placeholder"] = st.empty()
+    st.session_state["live_progress_placeholder"] = st.empty()
+    st.session_state["live_event_placeholder"] = st.empty()    
 
     refresh_live_batch_activity()
 
