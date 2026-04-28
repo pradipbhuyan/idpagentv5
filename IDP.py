@@ -1196,7 +1196,7 @@ def send_email_with_gmail_smtp(
     recipient_email: str,
     attachments: list,
     subject: str = "IDP Downloadable Files",
-    body: str = "Please find the requested files attached."
+    body: str = "Hi - Please find the requested files attached."
 ):
     if not sender_email or not sender_password or not recipient_email:
         raise ValueError("Sender email, Gmail app password, and recipient email are required.")
