@@ -1635,7 +1635,7 @@ def render_sidebar_and_upload():
             )
 
             if sender_configured:
-                st.success("Sender email is loaded from Streamlit secrets.")
+                st.success("Mail transport ready: Gmail SMTP with STARTTLS on port 587.")
             else:
                 st.error("Gmail sender credentials are missing in Streamlit secrets.")
 
