@@ -1189,6 +1189,34 @@ def get_current_downloadable_attachments():
 
     return attachments
 
+def get_batch_downloadable_attachments():
+    attachments = []
+
+    resume_count, invoice_count = get_batch_download_counts()
+
+    if resume_count > 0:
+        attachments.append({
+            "filename": "all_resumes.zip",
+            "data": build_zip_from_batch_results("resume"),
+            "mime": "application/zip",
+        })
+
+    if invoice_count > 0:
+        attachments.append({
+            "filename": "all_invoice_excels.zip",
+            "data": build_zip_from_batch_results("invoice"),
+            "mime": "application/zip",
+        })
+
+    pdf_bytes = st.session_state.get("detailed_assessment_pdf")
+    if pdf_bytes:
+        attachments.append({
+            "filename": "DetailedAssesment.pdf",
+            "data": pdf_bytes,
+            "mime": "application/pdf",
+        })
+
+    return attachments
 
 def send_email_with_gmail_smtp(
     sender_email: str,
@@ -2134,7 +2162,9 @@ def render_batch_downloads():
     st.markdown("### Batch Downloads")
 
     resume_count, invoice_count = get_batch_download_counts()
-    d1, d2 = st.columns(2)
+    has_pdf = bool(st.session_state.get("detailed_assessment_pdf"))
+
+    d1, d2, d3 = st.columns(3)
 
     with d1:
         if resume_count > 0:
@@ -2147,7 +2177,12 @@ def render_batch_downloads():
                 use_container_width=True
             )
         else:
-            st.button("Download All Resumes (0)", disabled=True, use_container_width=True, key="dl_all_resumes_disabled")
+            st.button(
+                "Download All Resumes (0)",
+                disabled=True,
+                use_container_width=True,
+                key="dl_all_resumes_disabled"
+            )
 
     with d2:
         if invoice_count > 0:
@@ -2160,8 +2195,40 @@ def render_batch_downloads():
                 use_container_width=True
             )
         else:
-            st.button("Download All Invoice Excels (0)", disabled=True, use_container_width=True, key="dl_all_invoices_disabled")
+            st.button(
+                "Download All Invoice Excels (0)",
+                disabled=True,
+                use_container_width=True,
+                key="dl_all_invoices_disabled"
+            )
 
+    with d3:
+        has_batch_attachments = (resume_count > 0) or (invoice_count > 0) or has_pdf
+
+        if st.button(
+            "Email Batch Files",
+            use_container_width=True,
+            disabled=not has_batch_attachments,
+            key="email_batch_files"
+        ):
+            try:
+                attachments = get_batch_downloadable_attachments()
+                send_email_with_gmail_smtp(
+                    sender_email=st.session_state.get("gmail_sender_email", ""),
+                    sender_password=st.session_state.get("gmail_sender_password", ""),
+                    recipient_email=st.session_state.get("email_recipient", ""),
+                    attachments=attachments,
+                    subject="IDP Batch Download Files",
+                    body="""Hi,
+
+Please find the requested files attached.
+
+Thanks,
+IDP"""
+                )
+                st.success("Batch files emailed successfully.")
+            except Exception as e:
+                st.error(f"Email sending failed: {str(e)}")
 
 def render_jd_ranking():
     st.markdown("### JD Match Ranking")
