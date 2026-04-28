@@ -198,8 +198,8 @@ DEFAULT_KEYS = {
     "sharepoint_selected_files": [],
     "onedrive_selected_files": [],
     # Email state
-    "gmail_sender_email": "",
-    "gmail_sender_password": "",
+    "gmail_sender_email": st.secrets.get("gmail_sender_email", ""),
+    "gmail_sender_password": st.secrets.get("gmail_sender_password", ""),
     "email_recipient": "",
 }
 for key, value in DEFAULT_KEYS.items():
@@ -1626,25 +1626,25 @@ def render_sidebar_and_upload():
         render_cloud_connections()
 
         st.markdown("---")
-        with st.expander("Email Settings (Gmail SMTP)", expanded=False):
-            st.session_state["gmail_sender_email"] = st.text_input(
-                "Gmail Sender Email",
-                value=st.session_state.get("gmail_sender_email", ""),
-                placeholder="yourname@gmail.com"
+
+
+        with st.expander("Email Settings", expanded=False):
+            sender_configured = bool(
+                st.session_state.get("gmail_sender_email") and
+                st.session_state.get("gmail_sender_password")
             )
-            st.session_state["gmail_sender_password"] = st.text_input(
-                "Gmail App Password",
-                type="password",
-                value=st.session_state.get("gmail_sender_password", ""),
-                placeholder="Use Gmail App Password"
-            )
+
+            if sender_configured:
+                st.success("Sender email is loaded from Streamlit secrets.")
+            else:
+                st.error("Gmail sender credentials are missing in Streamlit secrets.")
+
             st.session_state["email_recipient"] = st.text_input(
                 "Recipient Email",
                 value=st.session_state.get("email_recipient", ""),
                 placeholder="recipient@example.com"
             )
-            st.caption("Use a Gmail App Password, not your normal Gmail password.")
-
+        
         st.markdown("---")
         if st.button("Logout", use_container_width=True):
             for key in ["logged_in", "user", "role", "api_key"]:
