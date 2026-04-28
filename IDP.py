@@ -1687,17 +1687,29 @@ def render_sidebar_and_upload():
             st.session_state.batch_processed_files = 0
             st.session_state.batch_current_file = None
             st.session_state.batch_file_statuses = []
+            st.session_state.active_batch_index = 0
+    
             st.session_state.jd_rankings = []
             st.session_state.jd_text = ""
+    
+            st.session_state.detailed_assessment_data = None
+            st.session_state.detailed_assessment_pdf = None
+    
+            if "detailed_assessment_candidate_selector" in st.session_state:
+                del st.session_state["detailed_assessment_candidate_selector"]
+            if "jd_candidate_selector" in st.session_state:
+                del st.session_state["jd_candidate_selector"]
+            if "batch_result_selector" in st.session_state:
+                del st.session_state["batch_result_selector"]
+    
             st.session_state.cloud_selected_files = []
             st.session_state.sharepoint_selected_files = []
             st.session_state.onedrive_selected_files = []
-            st.session_state.detailed_assessment_data = None
-            st.session_state.detailed_assessment_pdf = None
             st.session_state.uploader_key += 1
+    
             reset_run_state()
             st.rerun()
-
+    
     if uploaded_files and len(uploaded_files) > MAX_BATCH_FILES:
         st.error(f"Batch limit exceeded. Maximum allowed is {MAX_BATCH_FILES} files.")
         uploaded_files = uploaded_files[:MAX_BATCH_FILES]
@@ -2280,8 +2292,10 @@ def render_detailed_assessment_report():
 
     report_data = st.session_state.get("detailed_assessment_data")
     pdf_bytes = st.session_state.get("detailed_assessment_pdf")
-
-    if not report_data:
+    batch_results = st.session_state.get("batch_results", [])
+    jd_rankings = st.session_state.get("jd_rankings", [])
+    
+    if not report_data or not batch_results or not jd_rankings:
         st.caption("No detailed assessment generated yet.")
         return
 
