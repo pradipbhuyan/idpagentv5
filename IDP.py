@@ -2631,58 +2631,149 @@ def render_detailed_assessment_report():
 render_header()
 uploaded_files = render_sidebar_and_upload()
 
-left_col, right_col = st.columns([1, 1.6], gap="large")
+st.markdown("### Activity")
+st.session_state["live_pipeline_placeholder"] = st.empty()
 
-with left_col:
-    st.markdown("### Activity")
-    st.session_state["live_pipeline_placeholder"] = st.empty()
+st.markdown("---")
+st.session_state["live_step_placeholder"] = st.empty()
+st.session_state["live_progress_placeholder"] = st.empty()
+st.session_state["live_event_placeholder"] = st.empty()
 
-    st.markdown("---")
-    st.session_state["live_step_placeholder"] = st.empty()
-    st.session_state["live_progress_placeholder"] = st.empty()
-    st.session_state["live_event_placeholder"] = st.empty()
+refresh_live_batch_activity()
 
-    refresh_live_batch_activity()
+current_batch_signature = get_batch_signature(uploaded_files)
+last_batch_signature = st.session_state.get("last_batch_signature")
+source_mode = st.session_state.get("source_mode", "Local Upload")
 
-    current_batch_signature = get_batch_signature(uploaded_files)
-    last_batch_signature = st.session_state.get("last_batch_signature")
-    source_mode = st.session_state.get("source_mode", "Local Upload")
+process_disabled = not uploaded_files
+if source_mode in ["SharePoint", "OneDrive"]:
+    process_disabled = True
 
-    process_disabled = not uploaded_files
-    if source_mode in ["SharePoint", "OneDrive"]:
-        process_disabled = True
+if st.button("Process Batch", use_container_width=True, disabled=process_disabled):
+    if current_batch_signature and current_batch_signature == last_batch_signature:
+        st.session_state.show_reprocess_confirm = True
+        st.session_state.pending_batch_signature = current_batch_signature
+    else:
+        st.session_state.batch_results = []
+        st.session_state.exception_queue = []
+        st.session_state.jd_rankings = []
+        st.session_state.detailed_assessment_data = None
+        st.session_state.detailed_assessment_pdf = None
+        st.session_state.show_reprocess_confirm = False
+        st.session_state.pending_batch_signature = None
 
-    if st.button("Process Batch", use_container_width=True, disabled=process_disabled):
-        if current_batch_signature and current_batch_signature == last_batch_signature:
-            st.session_state.show_reprocess_confirm = True
-            st.session_state.pending_batch_signature = current_batch_signature
-        else:
+        st.session_state.batch_started_at = time.time()
+        st.session_state.batch_completed_at = None
+        st.session_state.batch_elapsed_seconds = 0.0
+
+        st.session_state.batch_total_files = len(uploaded_files)
+        st.session_state.batch_processed_files = 0
+        st.session_state.batch_current_file = None
+        st.session_state.batch_file_statuses = [
+            {"file_name": f.name, "status": "pending", "message": ""}
+            for f in uploaded_files
+        ]
+        refresh_live_batch_activity()
+
+        for uploaded_file in uploaded_files:
+            try:
+                st.session_state["current_file_started_at"] = time.time()
+                st.session_state.batch_current_file = uploaded_file.name
+                update_batch_file_status(uploaded_file.name, "running", "Processing started")
+                refresh_live_batch_activity()
+
+                result = process_single_file(uploaded_file)
+                st.session_state.batch_results.append(result)
+
+                if result.get("status") == "Exception":
+                    st.session_state.exception_queue.append(result)
+                    update_batch_file_status(
+                        uploaded_file.name,
+                        "error",
+                        result.get("exception_reason", "Exception")
+                    )
+                elif result.get("status") == "Review Needed":
+                    update_batch_file_status(uploaded_file.name, "done", "Review Needed")
+                else:
+                    update_batch_file_status(
+                        uploaded_file.name,
+                        "done",
+                        result.get("status", "Completed")
+                    )
+
+            except Exception as e:
+                error_result = {
+                    "file_name": uploaded_file.name,
+                    "status": "Exception",
+                    "doc_type": "unknown",
+                    "ocr_used": False,
+                    "exception_reason": f"Unhandled error: {str(e)}",
+                    "cost": 0.0,
+                    "tokens": 0,
+                    "duplicate_info": {
+                        "is_duplicate": False,
+                        "match_file": None,
+                        "reason": None,
+                        "score": 0.0,
+                    },
+                    "agent_events": deepcopy(st.session_state.get("agent_events", [])),
+                    "agent_timings": deepcopy(st.session_state.get("agent_timings", {})),
+                }
+                st.session_state.batch_results.append(error_result)
+                st.session_state.exception_queue.append(error_result)
+                update_batch_file_status(uploaded_file.name, "error", f"Unhandled error: {str(e)}")
+
+            finally:
+                st.session_state.batch_processed_files += 1
+                st.session_state["progress_value"] = 0
+                st.session_state["current_file_started_at"] = None
+                refresh_live_batch_activity()
+
+        if st.session_state.batch_results:
+            load_batch_result_into_session(0)
+            st.session_state.batch_processed = True
+            st.session_state.last_batch_signature = current_batch_signature
+            st.session_state.batch_completed_at = time.time()
+            st.session_state.batch_elapsed_seconds = (
+                st.session_state.batch_completed_at - st.session_state.batch_started_at
+            )
+            st.success("Batch processing completed")
+
+if source_mode in ["SharePoint", "OneDrive"]:
+    st.info(
+        f"{source_mode} access UI is ready. Processing remains disabled until file retrieval is wired into the batch pipeline."
+    )
+
+if st.session_state.get("show_reprocess_confirm"):
+    st.warning("This same batch was already processed. Do you want to re-process it again?")
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        if st.button("Yes, Re-process", use_container_width=True):
             st.session_state.batch_results = []
             st.session_state.exception_queue = []
             st.session_state.jd_rankings = []
             st.session_state.detailed_assessment_data = None
             st.session_state.detailed_assessment_pdf = None
-            st.session_state.show_reprocess_confirm = False
-            st.session_state.pending_batch_signature = None
-
             st.session_state.batch_started_at = time.time()
             st.session_state.batch_completed_at = None
             st.session_state.batch_elapsed_seconds = 0.0
 
-            st.session_state.batch_total_files = len(uploaded_files)
+            st.session_state.batch_total_files = len(uploaded_files or [])
             st.session_state.batch_processed_files = 0
             st.session_state.batch_current_file = None
             st.session_state.batch_file_statuses = [
                 {"file_name": f.name, "status": "pending", "message": ""}
-                for f in uploaded_files
+                for f in (uploaded_files or [])
             ]
             refresh_live_batch_activity()
 
-            for uploaded_file in uploaded_files:
+            for uploaded_file in (uploaded_files or []):
                 try:
                     st.session_state["current_file_started_at"] = time.time()
                     st.session_state.batch_current_file = uploaded_file.name
-                    update_batch_file_status(uploaded_file.name, "running", "Processing started")
+                    update_batch_file_status(uploaded_file.name, "running", "Re-processing started")
                     refresh_live_batch_activity()
 
                     result = process_single_file(uploaded_file)
@@ -2735,126 +2826,26 @@ with left_col:
             if st.session_state.batch_results:
                 load_batch_result_into_session(0)
                 st.session_state.batch_processed = True
-                st.session_state.last_batch_signature = current_batch_signature
+                st.session_state.last_batch_signature = st.session_state.get("pending_batch_signature")
                 st.session_state.batch_completed_at = time.time()
                 st.session_state.batch_elapsed_seconds = (
                     st.session_state.batch_completed_at - st.session_state.batch_started_at
                 )
-                st.success("Batch processing completed")
+                st.success("Batch re-processing completed")
 
-    if source_mode in ["SharePoint", "OneDrive"]:
-        st.info(
-            f"{source_mode} access UI is ready. Processing remains disabled until file retrieval is wired into the batch pipeline."
-        )
+            st.session_state.show_reprocess_confirm = False
+            st.session_state.pending_batch_signature = None
+            st.rerun()
 
-    if st.session_state.get("show_reprocess_confirm"):
-        st.warning("This same batch was already processed. Do you want to re-process it again?")
+    with c2:
+        if st.button("No", use_container_width=True):
+            st.session_state.show_reprocess_confirm = False
+            st.session_state.pending_batch_signature = None
+            st.info("Re-processing cancelled")
+            st.rerun()
 
-        c1, c2 = st.columns(2)
-
-        with c1:
-            if st.button("Yes, Re-process", use_container_width=True):
-                st.session_state.batch_results = []
-                st.session_state.exception_queue = []
-                st.session_state.jd_rankings = []
-                st.session_state.detailed_assessment_data = None
-                st.session_state.detailed_assessment_pdf = None
-                st.session_state.batch_started_at = time.time()
-                st.session_state.batch_completed_at = None
-                st.session_state.batch_elapsed_seconds = 0.0
-
-                st.session_state.batch_total_files = len(uploaded_files or [])
-                st.session_state.batch_processed_files = 0
-                st.session_state.batch_current_file = None
-                st.session_state.batch_file_statuses = [
-                    {"file_name": f.name, "status": "pending", "message": ""}
-                    for f in (uploaded_files or [])
-                ]
-                refresh_live_batch_activity()
-
-                for uploaded_file in (uploaded_files or []):
-                    try:
-                        st.session_state["current_file_started_at"] = time.time()
-                        st.session_state.batch_current_file = uploaded_file.name
-                        update_batch_file_status(uploaded_file.name, "running", "Re-processing started")
-                        refresh_live_batch_activity()
-
-                        result = process_single_file(uploaded_file)
-                        st.session_state.batch_results.append(result)
-
-                        if result.get("status") == "Exception":
-                            st.session_state.exception_queue.append(result)
-                            update_batch_file_status(
-                                uploaded_file.name,
-                                "error",
-                                result.get("exception_reason", "Exception")
-                            )
-                        elif result.get("status") == "Review Needed":
-                            update_batch_file_status(uploaded_file.name, "done", "Review Needed")
-                        else:
-                            update_batch_file_status(
-                                uploaded_file.name,
-                                "done",
-                                result.get("status", "Completed")
-                            )
-
-                    except Exception as e:
-                        error_result = {
-                            "file_name": uploaded_file.name,
-                            "status": "Exception",
-                            "doc_type": "unknown",
-                            "ocr_used": False,
-                            "exception_reason": f"Unhandled error: {str(e)}",
-                            "cost": 0.0,
-                            "tokens": 0,
-                            "duplicate_info": {
-                                "is_duplicate": False,
-                                "match_file": None,
-                                "reason": None,
-                                "score": 0.0,
-                            },
-                            "agent_events": deepcopy(st.session_state.get("agent_events", [])),
-                            "agent_timings": deepcopy(st.session_state.get("agent_timings", {})),
-                        }
-                        st.session_state.batch_results.append(error_result)
-                        st.session_state.exception_queue.append(error_result)
-                        update_batch_file_status(uploaded_file.name, "error", f"Unhandled error: {str(e)}")
-
-                    finally:
-                        st.session_state.batch_processed_files += 1
-                        st.session_state["progress_value"] = 0
-                        st.session_state["current_file_started_at"] = None
-                        refresh_live_batch_activity()
-
-                if st.session_state.batch_results:
-                    load_batch_result_into_session(0)
-                    st.session_state.batch_processed = True
-                    st.session_state.last_batch_signature = st.session_state.get("pending_batch_signature")
-                    st.session_state.batch_completed_at = time.time()
-                    st.session_state.batch_elapsed_seconds = (
-                        st.session_state.batch_completed_at - st.session_state.batch_started_at
-                    )
-                    st.success("Batch re-processing completed")
-
-                st.session_state.show_reprocess_confirm = False
-                st.session_state.pending_batch_signature = None
-                st.rerun()
-
-        with c2:
-            if st.button("No", use_container_width=True):
-                st.session_state.show_reprocess_confirm = False
-                st.session_state.pending_batch_signature = None
-                st.info("Re-processing cancelled")
-                st.rerun()
-
-RESULT_TOP_OFFSET_PX = 90
-
-with right_col:
-    st.markdown(
-        f"<div style='margin-top: {RESULT_TOP_OFFSET_PX}px;'></div>",
-        unsafe_allow_html=True
-    )
-    render_result_workspace()
+st.markdown("---")
+render_result_workspace()
 
 
 st.markdown("---")
