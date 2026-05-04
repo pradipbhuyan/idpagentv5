@@ -656,13 +656,55 @@ def render_agent_pipeline():
                 "message": event.get("message", ""),
             }
 
+    def connector_style(current_status, current_step, next_status):
+        is_active = current_status == "running" or current_step == active_agent
+        is_done_flow = current_status == "done" and next_status in ["running", "done", "error"]
+        is_error = current_status == "error"
+
+        if is_error:
+            return {
+                "line": "#dc2626",
+                "arrow": "#dc2626",
+                "shadow": "rgba(220,38,38,0.20)",
+            }
+        if is_active:
+            return {
+                "line": "#2563eb",
+                "arrow": "#2563eb",
+                "shadow": "rgba(37,99,235,0.22)",
+            }
+        if is_done_flow:
+            return {
+                "line": "#16a34a",
+                "arrow": "#16a34a",
+                "shadow": "rgba(22,163,74,0.18)",
+            }
+        return {
+            "line": "#cbd5e1",
+            "arrow": "#94a3b8",
+            "shadow": "transparent",
+        }
+
     html_parts = [
         textwrap.dedent("""
         <div style="margin-top:10px;">
             <div style="font-weight:700;font-size:16px;margin-bottom:10px;">
                 Agentic Pipeline Flow
             </div>
-            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+            <div style="
+                overflow-x:auto;
+                overflow-y:hidden;
+                padding-bottom:8px;
+                width:100%;
+            ">
+                <div style="
+                    display:flex;
+                    flex-wrap:nowrap;
+                    align-items:center;
+                    gap:0;
+                    min-width:max-content;
+                    width:max-content;
+                ">
         """).strip()
     ]
 
@@ -689,8 +731,8 @@ def render_agent_pipeline():
             icon = "❌"
             text = "#b42318"
         else:
-            bg = "#f5f5f5"
-            border = "#dddddd"
+            bg = "#f8fafc"
+            border = "#dbe1e8"
             icon = "⏳"
             text = "#6b7280"
 
@@ -703,20 +745,34 @@ def render_agent_pipeline():
 
         card_html = textwrap.dedent(f"""
         <div style="
-            min-width:128px;
-            max-width:150px;
+            width:148px;
+            min-width:148px;
             padding:12px 10px;
+            margin-right:0;
             border-radius:14px;
             border:1px solid {border};
             background:{bg};
             text-align:center;
             box-sizing:border-box;
+            flex:0 0 auto;
         ">
             <div style="font-size:18px;line-height:1;">{icon}</div>
-            <div style="font-weight:700;color:{text};font-size:12px;margin-top:6px;">
+            <div style="
+                font-weight:700;
+                color:{text};
+                font-size:12px;
+                margin-top:6px;
+                white-space:normal;
+                word-break:break-word;
+            ">
                 {short_name}
             </div>
-            <div style="font-size:11px;color:#4b5563;margin-top:4px;word-break:break-word;">
+            <div style="
+                font-size:11px;
+                color:#4b5563;
+                margin-top:4px;
+                word-break:break-word;
+            ">
                 {subtitle}
             </div>
         </div>
@@ -726,49 +782,45 @@ def render_agent_pipeline():
         if index < len(pipeline) - 1:
             next_step = pipeline[index + 1]
             next_status = status_map[next_step]["status"]
+            conn = connector_style(status, step, next_status)
 
-            if status == "done" and next_status in ["running", "done", "error"]:
-                arrow_symbol = "➜"
-                arrow_bg = "#ecfdf3"
-                arrow_border = "#86efac"
-                arrow_fg = "#16a34a"
-            elif status == "running" or step == active_agent:
-                arrow_symbol = "➜"
-                arrow_bg = "#eff6ff"
-                arrow_border = "#93c5fd"
-                arrow_fg = "#2563eb"
-            elif status == "error":
-                arrow_symbol = "✕"
-                arrow_bg = "#fef2f2"
-                arrow_border = "#fca5a5"
-                arrow_fg = "#dc2626"
-            else:
-                arrow_symbol = "➜"
-                arrow_bg = "#f9fafb"
-                arrow_border = "#e5e7eb"
-                arrow_fg = "#9ca3af"
-
-            arrow_html = textwrap.dedent(f"""
+            connector_html = textwrap.dedent(f"""
             <div style="
+                width:56px;
+                min-width:56px;
+                height:24px;
                 display:flex;
                 align-items:center;
                 justify-content:center;
-                min-width:38px;
-                height:38px;
-                border-radius:999px;
-                border:1px solid {arrow_border};
-                background:{arrow_bg};
-                color:{arrow_fg};
-                font-size:18px;
-                font-weight:800;
-                margin:0 2px;
+                position:relative;
+                flex:0 0 auto;
             ">
-                {arrow_symbol}
+                <div style="
+                    width:40px;
+                    height:3px;
+                    background:{conn['line']};
+                    border-radius:999px;
+                    box-shadow:0 0 0 2px {conn['shadow']};
+                "></div>
+                <div style="
+                    position:absolute;
+                    right:6px;
+                    width:0;
+                    height:0;
+                    border-top:6px solid transparent;
+                    border-bottom:6px solid transparent;
+                    border-left:10px solid {conn['arrow']};
+                "></div>
             </div>
             """).strip()
-            html_parts.append(arrow_html)
+            html_parts.append(connector_html)
 
-    html_parts.append("</div></div>")
+    html_parts.append("""
+                </div>
+            </div>
+        </div>
+    """)
+
     pipeline_placeholder.markdown("".join(html_parts), unsafe_allow_html=True)
 
 def update_batch_file_status(file_name, status, message=""):
