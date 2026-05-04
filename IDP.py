@@ -662,48 +662,35 @@ def render_agent_pipeline():
         is_error = current_status == "error"
 
         if is_error:
-            return {
-                "line": "#dc2626",
-                "arrow": "#dc2626",
-                "shadow": "rgba(220,38,38,0.20)",
-            }
+            return {"line": "#dc2626", "arrow": "#dc2626", "shadow": "rgba(220,38,38,0.18)"}
         if is_active:
-            return {
-                "line": "#2563eb",
-                "arrow": "#2563eb",
-                "shadow": "rgba(37,99,235,0.22)",
-            }
+            return {"line": "#2563eb", "arrow": "#2563eb", "shadow": "rgba(37,99,235,0.18)"}
         if is_done_flow:
-            return {
-                "line": "#16a34a",
-                "arrow": "#16a34a",
-                "shadow": "rgba(22,163,74,0.18)",
-            }
-        return {
-            "line": "#cbd5e1",
-            "arrow": "#94a3b8",
-            "shadow": "transparent",
-        }
+            return {"line": "#16a34a", "arrow": "#16a34a", "shadow": "rgba(22,163,74,0.16)"}
+        return {"line": "#94a3b8", "arrow": "#94a3b8", "shadow": "transparent"}
 
     html_parts = [
         textwrap.dedent("""
-        <div style="margin-top:10px;">
+        <div style="margin-top:10px; width:100%; max-width:100%; overflow:hidden;">
             <div style="font-weight:700;font-size:16px;margin-bottom:10px;">
                 Agentic Pipeline Flow
             </div>
             <div style="
+                width:100%;
+                max-width:100%;
                 overflow-x:auto;
                 overflow-y:hidden;
+                box-sizing:border-box;
                 padding-bottom:8px;
-                width:100%;
             ">
                 <div style="
                     display:flex;
                     flex-wrap:nowrap;
                     align-items:center;
                     gap:0;
-                    min-width:max-content;
                     width:max-content;
+                    min-width:max-content;
+                    box-sizing:border-box;
                 ">
         """).strip()
     ]
@@ -745,16 +732,17 @@ def render_agent_pipeline():
 
         card_html = textwrap.dedent(f"""
         <div style="
-            width:148px;
-            min-width:148px;
+            width:132px;
+            min-width:132px;
+            max-width:132px;
             padding:12px 10px;
-            margin-right:0;
             border-radius:14px;
             border:1px solid {border};
             background:{bg};
             text-align:center;
             box-sizing:border-box;
             flex:0 0 auto;
+            overflow:hidden;
         ">
             <div style="font-size:18px;line-height:1;">{icon}</div>
             <div style="
@@ -764,6 +752,7 @@ def render_agent_pipeline():
                 margin-top:6px;
                 white-space:normal;
                 word-break:break-word;
+                overflow-wrap:anywhere;
             ">
                 {short_name}
             </div>
@@ -772,6 +761,7 @@ def render_agent_pipeline():
                 color:#4b5563;
                 margin-top:4px;
                 word-break:break-word;
+                overflow-wrap:anywhere;
             ">
                 {subtitle}
             </div>
@@ -786,17 +776,19 @@ def render_agent_pipeline():
 
             connector_html = textwrap.dedent(f"""
             <div style="
-                width:56px;
-                min-width:56px;
+                width:42px;
+                min-width:42px;
+                max-width:42px;
                 height:24px;
                 display:flex;
                 align-items:center;
                 justify-content:center;
                 position:relative;
                 flex:0 0 auto;
+                overflow:hidden;
             ">
                 <div style="
-                    width:40px;
+                    width:28px;
                     height:3px;
                     background:{conn['line']};
                     border-radius:999px;
@@ -804,12 +796,12 @@ def render_agent_pipeline():
                 "></div>
                 <div style="
                     position:absolute;
-                    right:6px;
+                    right:2px;
                     width:0;
                     height:0;
-                    border-top:6px solid transparent;
-                    border-bottom:6px solid transparent;
-                    border-left:10px solid {conn['arrow']};
+                    border-top:5px solid transparent;
+                    border-bottom:5px solid transparent;
+                    border-left:8px solid {conn['arrow']};
                 "></div>
             </div>
             """).strip()
