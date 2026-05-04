@@ -622,6 +622,7 @@ def refresh_live_batch_activity():
     render_agent_pipeline()
 
 
+
 def render_agent_pipeline():
     pipeline_placeholder = st.session_state.get("live_pipeline_placeholder")
     if pipeline_placeholder is None:
@@ -659,18 +660,17 @@ def render_agent_pipeline():
         textwrap.dedent("""
         <div style="margin-top:10px;">
             <div style="font-weight:700;font-size:16px;margin-bottom:10px;">
-                Agentic Pipeline
+                Agentic Pipeline Flow
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
         """).strip()
     ]
 
-    for step in pipeline:
+    for index, step in enumerate(pipeline):
         item = status_map[step]
         status = item["status"]
         elapsed = timings.get(step, {}).get("elapsed")
         running_since = timings.get(step, {}).get("started_at")
-
         short_name = step.replace(" Agent", "")
 
         if status == "done":
@@ -703,30 +703,73 @@ def render_agent_pipeline():
 
         card_html = textwrap.dedent(f"""
         <div style="
-            min-width:120px;
-            flex:1 1 120px;
+            min-width:128px;
+            max-width:150px;
             padding:12px 10px;
             border-radius:14px;
             border:1px solid {border};
             background:{bg};
             text-align:center;
+            box-sizing:border-box;
         ">
             <div style="font-size:18px;line-height:1;">{icon}</div>
             <div style="font-weight:700;color:{text};font-size:12px;margin-top:6px;">
                 {short_name}
             </div>
-            <div style="font-size:11px;color:#4b5563;margin-top:4px;">
+            <div style="font-size:11px;color:#4b5563;margin-top:4px;word-break:break-word;">
                 {subtitle}
             </div>
         </div>
         """).strip()
-
         html_parts.append(card_html)
 
+        if index < len(pipeline) - 1:
+            next_step = pipeline[index + 1]
+            next_status = status_map[next_step]["status"]
+
+            if status == "done" and next_status in ["running", "done", "error"]:
+                arrow_symbol = "➜"
+                arrow_bg = "#ecfdf3"
+                arrow_border = "#86efac"
+                arrow_fg = "#16a34a"
+            elif status == "running" or step == active_agent:
+                arrow_symbol = "➜"
+                arrow_bg = "#eff6ff"
+                arrow_border = "#93c5fd"
+                arrow_fg = "#2563eb"
+            elif status == "error":
+                arrow_symbol = "✕"
+                arrow_bg = "#fef2f2"
+                arrow_border = "#fca5a5"
+                arrow_fg = "#dc2626"
+            else:
+                arrow_symbol = "➜"
+                arrow_bg = "#f9fafb"
+                arrow_border = "#e5e7eb"
+                arrow_fg = "#9ca3af"
+
+            arrow_html = textwrap.dedent(f"""
+            <div style="
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                min-width:38px;
+                height:38px;
+                border-radius:999px;
+                border:1px solid {arrow_border};
+                background:{arrow_bg};
+                color:{arrow_fg};
+                font-size:18px;
+                font-weight:800;
+                margin:0 2px;
+            ">
+                {arrow_symbol}
+            </div>
+            """).strip()
+            html_parts.append(arrow_html)
+
     html_parts.append("</div></div>")
-
     pipeline_placeholder.markdown("".join(html_parts), unsafe_allow_html=True)
-
 
 def update_batch_file_status(file_name, status, message=""):
     statuses = st.session_state.get("batch_file_statuses", [])
