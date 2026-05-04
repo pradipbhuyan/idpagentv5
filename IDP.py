@@ -2847,8 +2847,15 @@ with left_col:
                 st.info("Re-processing cancelled")
                 st.rerun()
 
+RESULT_TOP_OFFSET_PX = 90
+
 with right_col:
+    st.markdown(
+        f"<div style='margin-top: {RESULT_TOP_OFFSET_PX}px;'></div>",
+        unsafe_allow_html=True
+    )
     render_result_workspace()
+
 
 st.markdown("---")
 render_batch_table()
