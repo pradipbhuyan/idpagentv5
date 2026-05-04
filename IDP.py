@@ -1319,15 +1319,24 @@ Thanks,
 IDP"""
 ):
     if not sender_email or not sender_password or not recipient_email:
-        raise ValueError("Sender email, Gmail app password, and recipient email are required.")
+        raise ValueError("Recipient email are required.")
 
     if not attachments:
         raise ValueError("No downloadable files available to email.")
 
+    recipients = [
+        email.strip()
+        for email in str(recipient_email).replace(";", ",").split(",")
+        if email.strip()
+    ]
+
+    if not recipients:
+        raise ValueError("Please provide at least one valid recipient email address.")
+
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = sender_email
-    msg["To"] = recipient_email
+    msg["To"] = ", ".join(recipients)
     msg.set_content(body)
 
     for item in attachments:
@@ -1342,7 +1351,6 @@ IDP"""
         smtp.starttls()
         smtp.login(sender_email, sender_password)
         smtp.send_message(msg)
-
 
 # ------------------------------
 # CLOUD SOURCE UI HELPERS
@@ -1762,7 +1770,7 @@ def render_sidebar_and_upload():
             st.session_state["email_recipient"] = st.text_input(
                 "Recipient Email",
                 value=st.session_state.get("email_recipient", ""),
-                placeholder="recipient@example.com"
+                placeholder="recipient1@example.com, recipient2@example.com"
             )
         
         st.markdown("---")
